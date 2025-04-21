@@ -3,6 +3,8 @@
 [![pub package](https://img.shields.io/pub/v/sliver_expansion_tile.svg)](https://pub.dev/packages/sliver_expansion_tile) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A Flutter sliver widget that mimics `ExpansionTile`, allowing items within a `CustomScrollView` to expand and collapse as a sliver.
+  
+This was part of the talk [The Dark Arts of RenderSliver: Mastering Custom Slivers in Flutter](https://www.droidcon.com/2024/10/17/the-dark-arts-of-rendersliver-mastering-custom-slivers-in-flutter/) at Fluttercon USA 2024.
 
 ## Features
 
