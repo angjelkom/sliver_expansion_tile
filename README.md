@@ -12,7 +12,9 @@ This was part of the talk [The Dark Arts of RenderSliver: Mastering Custom Slive
 - Fully customizable header, border, and border radius  
 - Programmatic control via `SliverExpansionTileController`  
 - Smooth animation with adjustable duration  
-- No external dependencies beyond Flutter SDK  
+- No external dependencies beyond Flutter SDK
+
+https://github.com/user-attachments/assets/aba0acd6-1537-4d71-b2a9-050a9ad8b8f6
 
 ## Getting Started
 
