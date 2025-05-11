@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:example/data.dart';
 import 'package:flutter/material.dart';
-import 'package:sliver_expansion_tile/sliver_expansion_tile.dart';
+import 'package:sliver_expansion_tile/sliver_expansion_tile_new.dart';
 
 void main() {
   runApp(const MainApp());
@@ -21,8 +21,8 @@ class MainApp extends StatelessWidget {
         backgroundColor: const Color(0xffE9EFEC),
         floatingActionButtonLocation:
             FloatingActionButtonLocation.miniCenterFloat,
-        floatingActionButton: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        floatingActionButton: Wrap(
+          alignment: WrapAlignment.center,
           children: [
             for (final palette in palettes) ...[
               FloatingActionButton.small(
@@ -37,6 +37,13 @@ class MainApp extends StatelessWidget {
                 child: const Icon(Icons.arrow_upward),
                 onPressed: () {
                   palette.controller.collapse();
+                },
+              ),
+              FloatingActionButton.small(
+                backgroundColor: palette.colors.last,
+                child: const Icon(Icons.stop),
+                onPressed: () {
+                  palette.controller.stop();
                 },
               ),
             ],
@@ -54,7 +61,19 @@ class MainApp extends StatelessWidget {
                   childCount: activites.first.length,
                 ),
               ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => ListTile(title: Text('Item $index')),
+                  childCount: 20,
+                ),
+              ),
               _PaletteTile(palette: palettes.first),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => ListTile(title: Text('Item $index')),
+                  childCount: 20,
+                ),
+              ),
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) =>
@@ -62,7 +81,7 @@ class MainApp extends StatelessWidget {
                   childCount: activites[1].length,
                 ),
               ),
-              _PaletteTile(palette: palettes[1]),
+              // _PaletteTile(palette: palettes[1]),
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) =>
@@ -70,7 +89,7 @@ class MainApp extends StatelessWidget {
                   childCount: activites.last.length,
                 ),
               ),
-              _PaletteTile(palette: palettes.last),
+              // _PaletteTile(palette: palettes.last),
               SliverPadding(
                 padding: EdgeInsets.all(
                   MediaQuery.viewPaddingOf(context).bottom + 24,
