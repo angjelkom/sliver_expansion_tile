@@ -344,23 +344,60 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
     double totalExtent = 0.0;
     double layoutOffset = -scrollOffset;
     bool hasVisualOverflow = false;
-    RenderBox? trailingChildWithLayout;
 
-    RenderBox? child = firstChild;
-    double headerExtent = 0.0;
+    RenderBox header = firstChild!;
 
-    while (layoutOffset < remainingPaintExtent) {
-      if (trailingChildWithLayout == null) {
-        child!.layout(childConstraints, parentUsesSize: true);
-      } else {
-        child = insertAndLayoutChild(
-          constraints.asBoxConstraints(),
-          parentUsesSize: true,
-          after: trailingChildWithLayout,
-        );
-        if (child == null) {
-          break;
-        }
+    header.layout(childConstraints, parentUsesSize: true);
+
+    final SliverMultiBoxAdaptorParentData? childParentData =
+        header.parentData as SliverMultiBoxAdaptorParentData?;
+    childParentData?.layoutOffset = layoutOffset;
+
+    double headerExtent = paintExtentOf(header);
+
+    totalExtent += headerExtent;
+    layoutOffset += headerExtent;
+
+    RenderBox? earliestChildWithLayout = header;
+    RenderBox? child = childAfter(header);
+
+    remainingPaintExtent = min(
+      headerExtent + originalRemainingPaintExtent * _animationController.value,
+      originalRemainingPaintExtent,
+    );
+
+    int total = 1;
+
+    while (child != null) {
+      child.layout(childConstraints, parentUsesSize: true);
+
+      final SliverMultiBoxAdaptorParentData? childParentData =
+          child.parentData as SliverMultiBoxAdaptorParentData?;
+
+      childParentData?.layoutOffset = layoutOffset;
+
+      double childExtent = paintExtentOf(child);
+
+      if (child == firstChild) {
+        headerExtent = childExtent;
+      }
+
+      totalExtent += childExtent;
+      layoutOffset += childExtent;
+      earliestChildWithLayout = child;
+      total++;
+
+      child = childAfter(child);
+    }
+
+    while (_isExpanded && layoutOffset < remainingPaintExtent) {
+      child = insertAndLayoutChild(
+        constraints.asBoxConstraints(),
+        parentUsesSize: true,
+        after: earliestChildWithLayout,
+      );
+      if (child == null) {
+        break;
       }
 
       final SliverMultiBoxAdaptorParentData? childParentData =
@@ -370,22 +407,11 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
 
       double childExtent = paintExtentOf(child);
 
-      if (trailingChildWithLayout == null) {
-        headerExtent = childExtent;
-      }
       totalExtent += childExtent;
       layoutOffset += childExtent;
-
-      if (!_isExpanded) {
-        break;
-      }
-
-      trailingChildWithLayout = child;
+      earliestChildWithLayout = child;
+      total++;
     }
-    remainingPaintExtent = max(
-      headerExtent,
-      originalRemainingPaintExtent * _animationController.value,
-    );
 
     final double paintExtent = calculatePaintOffset(
       constraints,
@@ -397,16 +423,17 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
 
     double clampedPaintExtent = paintExtent.clamp(0.0, remainingPaintExtent);
 
+    print('total: $total');
     geometry = SliverGeometry(
       scrollExtent: totalExtent,
       paintExtent: clampedPaintExtent,
       maxPaintExtent: totalExtent,
       hasVisualOverflow: hasVisualOverflow,
-      cacheExtent: calculateCacheOffset(
-        constraints,
-        from: 0.0,
-        to: totalExtent,
-      ),
+      // cacheExtent: calculateCacheOffset(
+      //   constraints,
+      //   from: childScrollOffset(firstChild!) ?? 0.0,
+      //   to: totalExtent,
+      // ),
     );
 
     childManager.didFinishLayout();
@@ -417,10 +444,8 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
     RenderBox? child = firstChild;
     final scrollOffset = constraints.scrollOffset;
     final double width = constraints.crossAxisExtent;
-    final height = max(
-      geometry!.scrollExtent * _animationController.value,
-      child!.size.height,
-    );
+    final height = geometry!.paintExtent;
+    final borderHeight = geometry!.scrollExtent;
 
     final bounds = Offset.zero & Size(width, height);
     final clipRRect = RRect.fromRectAndRadius(bounds, _borderRadius);
@@ -433,24 +458,25 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
         final SliverMultiBoxAdaptorParentData? childParentData =
             child!.parentData as SliverMultiBoxAdaptorParentData?;
 
-        if (child == firstChild || _animationController.value > 0) {
-          innerContext.paintChild(
-            child!,
-            innerOffset + Offset(0, childParentData?.layoutOffset ?? 0),
-          );
-        }
+        innerContext.paintChild(
+          child!,
+          innerOffset + Offset(0, childParentData?.layoutOffset ?? 0),
+        );
         child = childAfter(child!);
       }
 
       if (_border != null) {
+        // print(
+        //   'geometry: $geometry, offset: $offset, inner: $innerOffset, height: $height',
+        // );
         final Path path =
             Path()..addRRect(
               RRect.fromRectAndRadius(
                 Rect.fromLTWH(
-                  offset.dx,
-                  offset.dy - scrollOffset,
+                  innerOffset.dx,
+                  innerOffset.dy - scrollOffset,
                   width,
-                  height,
+                  borderHeight,
                 ),
                 _borderRadius,
               ),
