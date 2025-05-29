@@ -312,6 +312,22 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
       ..didStartLayout()
       ..setDidUnderflow(false);
 
+    final SliverConstraints constraints = this.constraints;
+    final BoxConstraints childConstraints = constraints.asBoxConstraints();
+    double scrollOffset = constraints.scrollOffset;
+
+    double originalRemainingPaintExtent = constraints.remainingPaintExtent;
+    double remainingPaintExtent = originalRemainingPaintExtent;
+
+    if (originalRemainingPaintExtent == 0.0) {
+      if (childCount > 0) {
+        collectGarbage(1, 0);
+      }
+      geometry = SliverGeometry.zero;
+      childManager.didFinishLayout();
+      return;
+    }
+
     if (firstChild == null) {
       if (!addInitialChild()) {
         geometry = SliverGeometry.zero;
@@ -333,13 +349,6 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
         }
       }
     }
-
-    final SliverConstraints constraints = this.constraints;
-    final BoxConstraints childConstraints = constraints.asBoxConstraints();
-    double scrollOffset = constraints.scrollOffset;
-
-    double originalRemainingPaintExtent = constraints.remainingPaintExtent;
-    double remainingPaintExtent = originalRemainingPaintExtent;
 
     double totalExtent = 0.0;
     double layoutOffset = -scrollOffset;
@@ -367,6 +376,19 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
     );
 
     int total = 1;
+    // print(
+    //   'childOffset: ${childScrollOffset(header)}, remaining: $remainingPaintExtent, original: $originalRemainingPaintExtent',
+    // );
+    //
+    RenderBox? leadingGarbageChild;
+    RenderBox? trailingGarbageChild;
+    int totalChildren = childManager.childCount;
+
+    if (layoutOffset < 0) {
+      leadingGarbageChild = header;
+    } else if (layoutOffset > remainingPaintExtent) {
+      trailingGarbageChild = header;
+    }
 
     while (child != null) {
       child.layout(childConstraints, parentUsesSize: true);
@@ -381,6 +403,14 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
       if (child == firstChild) {
         headerExtent = childExtent;
       }
+      if (layoutOffset < 0) {
+        leadingGarbageChild = child;
+      } else if (layoutOffset > remainingPaintExtent) {
+        trailingGarbageChild = child;
+      }
+      // print(
+      //   'layoutOffset: $layoutOffset, remainingPaintExtent: $remainingPaintExtent',
+      // );
 
       totalExtent += childExtent;
       layoutOffset += childExtent;
@@ -390,7 +420,37 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
       child = childAfter(child);
     }
 
-    while (_isExpanded && layoutOffset < remainingPaintExtent) {
+    int leadingGarbage =
+        leadingGarbageChild != null
+            ? calculateLeadingGarbage(
+              firstIndex: indexOf(leadingGarbageChild) + 1,
+            )
+            : 0;
+
+    int trailingGarbage =
+        trailingGarbageChild != null
+            ? calculateTrailingGarbage(
+              lastIndex: indexOf(trailingGarbageChild) - 1,
+            )
+            : 0;
+
+    // print(
+    //   'leading: $leadingGarbage, $leadingGarbageChild, trailing: $trailingGarbage, $trailingGarbageChild',
+    // );
+
+    collectGarbage(leadingGarbage, trailingGarbage);
+
+    if (firstChild == null) {
+      geometry = SliverGeometry.zero;
+      childManager.didFinishLayout();
+      return;
+    }
+    print('total: $totalChildren, count: $childCount');
+
+    while (_isExpanded &&
+        layoutOffset < remainingPaintExtent &&
+        childCount < totalChildren) {
+      print('its inserting, $layoutOffset, $remainingPaintExtent');
       child = insertAndLayoutChild(
         constraints.asBoxConstraints(),
         parentUsesSize: true,
@@ -423,7 +483,7 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
 
     double clampedPaintExtent = paintExtent.clamp(0.0, remainingPaintExtent);
 
-    print('total: $total');
+    // print('total: $total');
     geometry = SliverGeometry(
       scrollExtent: totalExtent,
       paintExtent: clampedPaintExtent,
