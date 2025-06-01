@@ -309,6 +309,71 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
   }
 
   @override
+  void setupParentData(covariant RenderObject child) {
+    if (child.parentData is! SliverExpansionTileParentData) {
+      child.parentData = SliverExpansionTileParentData();
+    }
+  }
+
+  SliverExpansionTileParentData calculateParentData(RenderBox child) {
+    final SliverExpansionTileParentData childParentData = child.data;
+
+    if (!childParentData.needsLayout) {
+      return childParentData.calculate(scrollOffset: constraints.scrollOffset);
+      // return childParentData;
+    }
+
+    // final prevParentData =
+    //     childParentData.previousSibling?.parentData
+    //         as SliverExpansionTileParentData?;
+
+    return childParentData.calculate(
+      childExtent: paintExtentOf(child),
+      scrollOffset: constraints.scrollOffset,
+    );
+    // childParentData.childExtent = paintExtentOf(child);
+    // childParentData.layoutOffset = prevParentData?.nextLayoutOffset ?? 0;
+    // childParentData.nextLayoutOffset =
+    //     childParentData.layoutOffset! + childParentData.childExtent!;
+    // childParentData.scrollOffset = constraints.scrollOffset;
+    // // print('calc: $childParentData');
+    // childParentData.totalExtent =
+    //     (prevParentData?.totalExtent ?? 0) + childParentData.childExtent!;
+    // return childParentData;
+  }
+
+  SliverExpansionTileParentData calculatePrevParentData(RenderBox child) {
+    final SliverExpansionTileParentData childParentData = child.data;
+
+    if (!childParentData.needsLayout) {
+      // childParentData.scrollOffset = constraints.scrollOffset;
+      return childParentData.calculate(scrollOffset: constraints.scrollOffset);
+    }
+
+    // final nextParentData =
+    //     childParentData.nextSibling?.parentData
+    //         as SliverExpansionTileParentData?;
+
+    childParentData.calculate(
+      childExtent: paintExtentOf(child),
+      scrollOffset: constraints.scrollOffset,
+      leading: true,
+    );
+    print('prev child parent: $childParentData');
+    // childParentData.childExtent = paintExtentOf(child);
+    // childParentData.layoutOffset =
+    //     nextParentData.layoutOffset! - childParentData.childExtent!;
+    // childParentData.nextLayoutOffset =
+    //     childParentData.layoutOffset! + childParentData.childExtent!;
+    // childParentData.scrollOffset = constraints.scrollOffset;
+    // // print('calc: $childParentData');
+    // childParentData.totalExtent =
+    //     (nextParentData.totalExtent ?? 0) + childParentData.childExtent!;
+    // print('prev parent: $childParentData');
+    return childParentData;
+  }
+
+  @override
   void performLayout() {
     childManager
       ..didStartLayout()
@@ -320,6 +385,7 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
 
     double originalRemainingPaintExtent = constraints.remainingPaintExtent;
     double remainingPaintExtent = originalRemainingPaintExtent;
+    bool hasVisualOverflow = false;
 
     if (originalRemainingPaintExtent == 0.0) {
       if (childCount > 0) {
@@ -329,76 +395,103 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
       childManager.didFinishLayout();
       return;
     }
-
+    // if (!_isExpanded) {
+    //   if (childCount > 1) {
+    //     collectGarbage(1, childCount - 1);
+    //   }
+    // }
     if (firstChild == null) {
-      if (!addInitialChild()) {
+      if (!addInitialChild(layoutOffset: -scrollOffset)) {
         geometry = SliverGeometry.zero;
         childManager.didFinishLayout();
         return;
       }
     }
 
-    if (!_isExpanded) {
-      if (childCount > 1) {
-        collectGarbage(1, childCount - 1);
-
-        if (firstChild == null) {
-          if (!addInitialChild()) {
-            geometry = SliverGeometry.zero;
-            childManager.didFinishLayout();
-            return;
-          }
-        }
-      }
-    }
-
-    double totalExtent = 0.0;
-    double layoutOffset = -scrollOffset;
-    bool hasVisualOverflow = false;
-    RenderBox? child = firstChild;
-    RenderBox? earliestChildWithLayout = child;
-
-    remainingPaintExtent =
-        _isExpanded
-            ? min(
-              _minExpandHeight +
-                  originalRemainingPaintExtent * _animationController.value,
-              originalRemainingPaintExtent,
-            )
-            : originalRemainingPaintExtent;
+    RenderBox? earliestChildWithLayout = lastChild;
+    RenderBox? child = firstChild!;
 
     int total = 1;
     RenderBox? leadingGarbageChild;
     RenderBox? trailingGarbageChild;
     int totalChildren = childManager.childCount;
+    remainingPaintExtent = min(
+      max(
+        firstChild!.childExtent,
+        originalRemainingPaintExtent * _animationController.value,
+      ),
+      originalRemainingPaintExtent,
+    );
 
+    // print('layout from here');
+    // while (child != null) {
+    //   // print('yes I will layout');
+    //   // child.layout(childConstraints, parentUsesSize: true);
+
+    //   // final SliverExpansionTileParentData? childParentData =
+    //   //     child.parentData as SliverExpansionTileParentData?;
+
+    //   // layoutOffset = childParentData?.layoutOffset ?? layoutOffset;
+
+    //   // childParentData?.layoutOffset ??= layoutOffset;
+
+    //   // double childExtent = childParentData?.childExtent ?? paintExtentOf(child);
+
+    //   // childParentData?.childExtent ??= childExtent;
+
+    //   // if (!_isExpanded && child == firstChild) {
+    //   //   _minExpandHeight = childExtent;
+    //   // }
+    //   // if (layoutOffset > remainingPaintExtent) {
+    //   //   trailingGarbageChild = child;
+    //   // }
+    //   // totalExtent += childExtent;
+    //   // layoutOffset += childExtent;
+    //   // earliestChildWithLayout = child;
+    //   // total++;
+
+    //   // if (layoutOffset < 0) {
+    //   //   leadingGarbageChild = child;
+    //   // }
+    //   // child = childAfter(child);
+
+    //   final SliverExpansionTileParentData? childParentData =
+    //       child.parentData as SliverExpansionTileParentData?;
+    //   print(
+    //     'child layout: ${childParentData?.layoutOffset}, index: ${indexOf(child)}',
+    //   );
+    //   final childExtent = childParentData?.childExtent ?? 0.0;
+    //   layoutOffset =
+    //       (childParentData?.layoutOffset ?? layoutOffset) + childExtent;
+    //   totalExtent += childExtent;
+    //   earliestChildWithLayout = child;
+    //   child = childAfter(child);
+    // }
     while (child != null) {
       child.layout(childConstraints, parentUsesSize: true);
+      // if (_isExpanded && scrollOffset > 0 || child == firstChild) {
+      calculateParentData(child);
 
-      final SliverMultiBoxAdaptorParentData? childParentData =
-          child.parentData as SliverMultiBoxAdaptorParentData?;
-
-      childParentData?.layoutOffset = layoutOffset;
-
-      double childExtent = paintExtentOf(child);
-
-      if (!_isExpanded && child == firstChild) {
-        _minExpandHeight = childExtent;
-      }
-      if (layoutOffset > remainingPaintExtent) {
-        trailingGarbageChild = child;
-      }
-      totalExtent += childExtent;
-      layoutOffset += childExtent;
-      earliestChildWithLayout = child;
-      total++;
-
-      if (layoutOffset < 0) {
-        leadingGarbageChild = child;
-      }
+      // print(
+      //   'indexOf: ${indexOf(child)}, updated parent data: $childParentData',
+      // );
+      // }
+      final prevChild = child;
       child = childAfter(child);
+      if (child != null) {
+        if (child.data.nextLayoutOffset < 0) {
+          leadingGarbageChild = prevChild;
+        }
+        // final nextChild = childAfter(child);
+        if (prevChild.data.layoutOffset > remainingPaintExtent) {
+          trailingGarbageChild = child;
+        }
+      }
     }
 
+    // print(
+    //   'early: ${leadingGarbageChild != null ? indexOf(leadingGarbageChild!) : null}',
+    // );
     int leadingGarbage =
         leadingGarbageChild != null
             ? calculateLeadingGarbage(
@@ -424,31 +517,45 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
       childManager.didFinishLayout();
       return;
     }
+    final secondChild = childAfter(firstChild!);
+    final firstChildIndex = indexOf(firstChild!);
+    print('first: ${firstChildIndex} ${firstChild!.nextLayoutOffset},');
+    while (firstChildIndex > 0 && firstChild!.nextLayoutOffset >= 0) {
+      print('adding leading child');
+      insertAndLayoutLeadingChild(childConstraints, parentUsesSize: true);
 
+      calculatePrevParentData(firstChild!);
+    }
+    print('remainging: $remainingPaintExtent');
+
+    // print('insert from here');
+
+    double layoutOffset = lastChild!.nextLayoutOffset;
     while (_isExpanded &&
         layoutOffset < remainingPaintExtent &&
         childCount < totalChildren) {
       child = insertAndLayoutChild(
         constraints.asBoxConstraints(),
         parentUsesSize: true,
-        after: earliestChildWithLayout,
+        after: lastChild,
       );
+      // print('new child: $child');
       if (child == null) {
         break;
       }
 
-      final SliverMultiBoxAdaptorParentData? childParentData =
-          child.parentData as SliverMultiBoxAdaptorParentData?;
+      final childParentData = calculateParentData(child);
 
-      childParentData?.layoutOffset = layoutOffset;
+      // print('index: ${indexOf(child)}, childParentData: $childParentData');
 
-      double childExtent = paintExtentOf(child);
-
-      totalExtent += childExtent;
-      layoutOffset += childExtent;
+      layoutOffset = childParentData!.nextLayoutOffset!;
       earliestChildWithLayout = child;
       total++;
     }
+
+    print('total: $childCount, $totalChildren');
+    // print('earliest: $earliestChildWithLayout');
+    final totalExtent = lastChild!.totalExtent;
 
     final double paintExtent = calculatePaintOffset(
       constraints,
@@ -492,8 +599,8 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
       Offset innerOffset,
     ) {
       while (child != null) {
-        final SliverMultiBoxAdaptorParentData? childParentData =
-            child!.parentData as SliverMultiBoxAdaptorParentData?;
+        final SliverExpansionTileParentData? childParentData =
+            child!.parentData as SliverExpansionTileParentData?;
 
         innerContext.paintChild(
           child!,
@@ -527,8 +634,8 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
 
   @override
   double childMainAxisPosition(covariant RenderObject child) {
-    final SliverMultiBoxAdaptorParentData? childParentData =
-        child.parentData as SliverMultiBoxAdaptorParentData?;
+    final SliverExpansionTileParentData? childParentData =
+        child.parentData as SliverExpansionTileParentData?;
     return childParentData?.layoutOffset ?? 0;
   }
 
@@ -563,8 +670,59 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
   }
 }
 
-class SliverExpansionTileParentData extends SliverPhysicalParentData
-    with ContainerParentDataMixin<RenderObject> {}
+class SliverExpansionTileParentData extends SliverMultiBoxAdaptorParentData {
+  double _childExtent = 0.0;
+  double _totalExtent = 0.0;
+
+  double _layoutOffset = 0.0;
+  double _scrollOffset = 0.0;
+
+  bool _needsLayout = true;
+
+  @override
+  double get layoutOffset => _layoutOffset - _scrollOffset;
+  double get nextLayoutOffset => layoutOffset + _childExtent;
+  double get childExtent => _childExtent;
+  double get totalExtent => _totalExtent;
+  bool get needsLayout => _needsLayout;
+
+  SliverExpansionTileParentData calculate({
+    double? childExtent,
+    double? scrollOffset,
+    bool leading = false,
+  }) {
+    _childExtent = childExtent ?? _childExtent;
+    _scrollOffset = scrollOffset ?? _scrollOffset;
+
+    if (!_needsLayout) {
+      return this;
+    }
+
+    if (leading) {
+      final nextParentData =
+          nextSibling?.parentData as SliverExpansionTileParentData?;
+
+      print('leading: $nextParentData');
+      _layoutOffset = (nextParentData?._layoutOffset ?? 0) - _childExtent;
+      _totalExtent = (nextParentData?._totalExtent ?? 0) - _childExtent;
+    } else {
+      final prevParentData =
+          previousSibling?.parentData as SliverExpansionTileParentData?;
+
+      _layoutOffset =
+          (prevParentData?._layoutOffset ?? 0) +
+          (prevParentData?._childExtent ?? 0);
+      _totalExtent = (prevParentData?.totalExtent ?? 0) + _childExtent;
+    }
+    _needsLayout = false;
+    return this;
+  }
+
+  @override
+  String toString() {
+    return 'index: $index; layoutOffset: $_layoutOffset; childExtent: $_childExtent; nextLayoutOffset: $nextLayoutOffset; totalExtent: $_totalExtent, scrollOffset: $_scrollOffset';
+  }
+}
 
 class _ExpansionTileTitle extends StatelessWidget {
   const _ExpansionTileTitle({
@@ -614,4 +772,14 @@ class _ExpansionTileTitle extends StatelessWidget {
       ),
     );
   }
+}
+
+extension SliverExpansionTileParentDataExtension on RenderBox {
+  SliverExpansionTileParentData get data =>
+      parentData as SliverExpansionTileParentData;
+
+  double get layoutOffset => data.layoutOffset;
+  double get nextLayoutOffset => data.nextLayoutOffset;
+  double get childExtent => data.childExtent;
+  double get totalExtent => data.totalExtent;
 }
