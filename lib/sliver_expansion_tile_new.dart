@@ -292,6 +292,8 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
 
   TapGestureRecognizer? _tapRecognizer;
 
+  double _minExpandHeight = 0.0;
+
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
@@ -353,42 +355,22 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
     double totalExtent = 0.0;
     double layoutOffset = -scrollOffset;
     bool hasVisualOverflow = false;
+    RenderBox? child = firstChild;
+    RenderBox? earliestChildWithLayout = child;
 
-    RenderBox header = firstChild!;
-
-    header.layout(childConstraints, parentUsesSize: true);
-
-    final SliverMultiBoxAdaptorParentData? childParentData =
-        header.parentData as SliverMultiBoxAdaptorParentData?;
-    childParentData?.layoutOffset = layoutOffset;
-
-    double headerExtent = paintExtentOf(header);
-
-    totalExtent += headerExtent;
-    layoutOffset += headerExtent;
-
-    RenderBox? earliestChildWithLayout = header;
-    RenderBox? child = childAfter(header);
-
-    remainingPaintExtent = min(
-      headerExtent + originalRemainingPaintExtent * _animationController.value,
-      originalRemainingPaintExtent,
-    );
+    remainingPaintExtent =
+        _isExpanded
+            ? min(
+              _minExpandHeight +
+                  originalRemainingPaintExtent * _animationController.value,
+              originalRemainingPaintExtent,
+            )
+            : originalRemainingPaintExtent;
 
     int total = 1;
-    // print(
-    //   'childOffset: ${childScrollOffset(header)}, remaining: $remainingPaintExtent, original: $originalRemainingPaintExtent',
-    // );
-    //
     RenderBox? leadingGarbageChild;
     RenderBox? trailingGarbageChild;
     int totalChildren = childManager.childCount;
-
-    if (layoutOffset < 0) {
-      leadingGarbageChild = header;
-    } else if (layoutOffset > remainingPaintExtent) {
-      trailingGarbageChild = header;
-    }
 
     while (child != null) {
       child.layout(childConstraints, parentUsesSize: true);
@@ -400,23 +382,20 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
 
       double childExtent = paintExtentOf(child);
 
-      if (child == firstChild) {
-        headerExtent = childExtent;
+      if (!_isExpanded && child == firstChild) {
+        _minExpandHeight = childExtent;
       }
-      if (layoutOffset < 0) {
-        leadingGarbageChild = child;
-      } else if (layoutOffset > remainingPaintExtent) {
+      if (layoutOffset > remainingPaintExtent) {
         trailingGarbageChild = child;
       }
-      // print(
-      //   'layoutOffset: $layoutOffset, remainingPaintExtent: $remainingPaintExtent',
-      // );
-
       totalExtent += childExtent;
       layoutOffset += childExtent;
       earliestChildWithLayout = child;
       total++;
 
+      if (layoutOffset < 0) {
+        leadingGarbageChild = child;
+      }
       child = childAfter(child);
     }
 
@@ -445,12 +424,10 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
       childManager.didFinishLayout();
       return;
     }
-    print('total: $totalChildren, count: $childCount');
 
     while (_isExpanded &&
         layoutOffset < remainingPaintExtent &&
         childCount < totalChildren) {
-      print('its inserting, $layoutOffset, $remainingPaintExtent');
       child = insertAndLayoutChild(
         constraints.asBoxConstraints(),
         parentUsesSize: true,
@@ -526,9 +503,6 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
       }
 
       if (_border != null) {
-        // print(
-        //   'geometry: $geometry, offset: $offset, inner: $innerOffset, height: $height',
-        // );
         final Path path =
             Path()..addRRect(
               RRect.fromRectAndRadius(
