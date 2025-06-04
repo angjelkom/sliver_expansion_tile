@@ -122,14 +122,16 @@ class _PaletteTile extends StatelessWidget {
       controller: palette.controller,
       title: Text(palette.name, style: TextStyle(color: textColor)),
       subtitle: Text(palette.description, style: TextStyle(color: textColor)),
-      children: [
-        for (final (index, color) in palette.colors.indexed)
-          _ColorPaletteBox(
-            key: ValueKey(color),
-            color: color,
-            index: index + 1,
-          ),
-      ],
+
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final color = palette.colors[index];
+
+        return _ColorPaletteBox(
+          key: ValueKey(color),
+          color: color,
+          index: index + 1,
+        );
+      }, childCount: palette.colors.length),
     );
   }
 }

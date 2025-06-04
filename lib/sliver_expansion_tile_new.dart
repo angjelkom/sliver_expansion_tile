@@ -58,7 +58,7 @@ class SliverExpansionTile extends StatefulWidget {
     this.subtitle,
     this.leading,
     this.trailing,
-    required this.children,
+    required this.delegate,
     this.initiallyExpanded = false,
     this.controller,
     this.border,
@@ -71,7 +71,7 @@ class SliverExpansionTile extends StatefulWidget {
   final Widget? subtitle;
   final Widget? leading;
   final Widget? trailing;
-  final List<Widget> children;
+  final SliverChildDelegate delegate;
   final bool initiallyExpanded;
   final SliverExpansionTileController? controller;
   final BorderSide? border;
@@ -136,25 +136,14 @@ class _SliverExpansionTileState extends State<SliverExpansionTile>
   @override
   Widget build(BuildContext context) {
     return _SliverExpansionTile(
-      title: _ExpansionTileTitle(
-        title: widget.title,
-        subtitle: widget.subtitle,
-        leading: widget.leading,
-        trailing:
-            widget.trailing ??
-            RotationTransition(
-              turns: _iconTurns,
-              child: const Icon(Icons.expand_more),
-            ),
-        color: widget.titleColor,
-      ),
       animationController: _animationController,
       controller: _tileController,
       isExpanded: _isExpanded,
       border: widget.border,
       borderRadius: widget.borderRadius,
-      delegate: SliverChildListDelegate([
-        _ExpansionTileTitle(
+      delegate: _SliverExpansionTileDelegate(
+        widget.delegate,
+        title: _ExpansionTileTitle(
           title: widget.title,
           subtitle: widget.subtitle,
           leading: widget.leading,
@@ -166,15 +155,13 @@ class _SliverExpansionTileState extends State<SliverExpansionTile>
               ),
           color: widget.titleColor,
         ),
-        ...widget.children,
-      ]),
+      ),
     );
   }
 }
 
 class _SliverExpansionTile extends SliverMultiBoxAdaptorWidget {
   const _SliverExpansionTile({
-    required this.title,
     required this.animationController,
     required this.controller,
     this.isExpanded = false,
@@ -183,7 +170,6 @@ class _SliverExpansionTile extends SliverMultiBoxAdaptorWidget {
     required super.delegate,
   });
 
-  final Widget title;
   final AnimationController animationController;
   final SliverExpansionTileController controller;
   final BorderSide? border;
@@ -203,6 +189,11 @@ class _SliverExpansionTile extends SliverMultiBoxAdaptorWidget {
       isExpanded: isExpanded,
     );
   }
+
+  // @override
+  // SliverExpansionTileNewElement createElement() {
+  //   return SliverExpansionTileNewElement(this);
+  // }
 
   @override
   void updateRenderObject(
@@ -790,4 +781,72 @@ extension SliverExpansionTileParentDataExtension on RenderBox {
   double get nextLayoutOffset => data.nextLayoutOffset;
   double get childExtent => data.childExtent;
   double get totalExtent => data.totalExtent;
+}
+
+// class SliverExpansionTileNewElement extends SliverMultiBoxAdaptorElement {
+//   SliverExpansionTileNewElement(super.widget);
+
+//   Element? _headerElement;
+
+//   @override
+//   void createChild(int index, {required RenderBox? after}) {
+//     if (index == 0) {
+//       final tileWidget = widget as _SliverExpansionTile;
+
+//       _headerElement = updateChild(_headerElement, tileWidget.title, 0);
+
+//       insertRenderObjectChild(_headerElement!.renderObject as RenderBox, 0);
+//       return;
+//     }
+//     super.createChild(index - 1, after: after);
+//   }
+
+//   @override
+//   void removeChild(RenderBox child) {
+//     if (_headerElement?.renderObject == child) {
+//       updateChild(_headerElement, null, 0);
+//       _headerElement = null;
+//       removeRenderObjectChild(child, 0);
+//       return;
+//     }
+//     super.removeChild(child);
+//   }
+
+//   @override
+//   void forgetChild(Element child) {
+//     if (_headerElement == child) {
+//       _headerElement = null;
+//     }
+//     super.forgetChild(child);
+//   }
+
+//   @override
+//   // TODO: implement childCount
+//   int get childCount => super.childCount + 1;
+// }
+
+class _SliverExpansionTileDelegate extends SliverChildDelegate {
+  final Widget title;
+  final SliverChildDelegate delegate;
+
+  _SliverExpansionTileDelegate(this.delegate, {required this.title});
+
+  @override
+  Widget? build(BuildContext context, int index) {
+    if (index == 0) {
+      return title;
+    }
+    return delegate.build(context, index - 1);
+  }
+
+  @override
+  bool shouldRebuild(covariant _SliverExpansionTileDelegate oldDelegate) {
+    return title != oldDelegate.title || delegate != oldDelegate.delegate;
+  }
+
+  @override
+  int? get estimatedChildCount {
+    final count = super.estimatedChildCount;
+    return count != null ? count + 1 : null;
+  }
 }
