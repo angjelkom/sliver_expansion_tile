@@ -190,11 +190,6 @@ class _SliverExpansionTile extends SliverMultiBoxAdaptorWidget {
     );
   }
 
-  // @override
-  // SliverExpansionTileNewElement createElement() {
-  //   return SliverExpansionTileNewElement(this);
-  // }
-
   @override
   void updateRenderObject(
     BuildContext context,
@@ -463,7 +458,7 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
         print('its first again');
         remainingPaintExtent = min(
           max(
-            firstChild!.childExtent,
+            indexOf(firstChild!) == 0 ? firstChild!.childExtent : 0,
             originalRemainingPaintExtent * _animationController.value,
           ),
           originalRemainingPaintExtent,
@@ -488,6 +483,20 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
         }
         // final nextChild = childAfter(child);
       }
+      if (remainingPaintExtent == 0.0) {
+        print('will break now');
+        break;
+      }
+    }
+
+    if (remainingPaintExtent == 0.0) {
+      print('will wipe all');
+      if (childCount > 0) {
+        collectGarbage(1, 0);
+      }
+      geometry = SliverGeometry.zero;
+      childManager.didFinishLayout();
+      return;
     }
 
     // print(
@@ -782,48 +791,6 @@ extension SliverExpansionTileParentDataExtension on RenderBox {
   double get childExtent => data.childExtent;
   double get totalExtent => data.totalExtent;
 }
-
-// class SliverExpansionTileNewElement extends SliverMultiBoxAdaptorElement {
-//   SliverExpansionTileNewElement(super.widget);
-
-//   Element? _headerElement;
-
-//   @override
-//   void createChild(int index, {required RenderBox? after}) {
-//     if (index == 0) {
-//       final tileWidget = widget as _SliverExpansionTile;
-
-//       _headerElement = updateChild(_headerElement, tileWidget.title, 0);
-
-//       insertRenderObjectChild(_headerElement!.renderObject as RenderBox, 0);
-//       return;
-//     }
-//     super.createChild(index - 1, after: after);
-//   }
-
-//   @override
-//   void removeChild(RenderBox child) {
-//     if (_headerElement?.renderObject == child) {
-//       updateChild(_headerElement, null, 0);
-//       _headerElement = null;
-//       removeRenderObjectChild(child, 0);
-//       return;
-//     }
-//     super.removeChild(child);
-//   }
-
-//   @override
-//   void forgetChild(Element child) {
-//     if (_headerElement == child) {
-//       _headerElement = null;
-//     }
-//     super.forgetChild(child);
-//   }
-
-//   @override
-//   // TODO: implement childCount
-//   int get childCount => super.childCount + 1;
-// }
 
 class _SliverExpansionTileDelegate extends SliverChildDelegate {
   final Widget title;
