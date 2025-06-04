@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import 'package:sliver_expansion_tile/sliver_expansion_tile_new.dart'
+import 'package:sliver_expansion_tile/sliver_expansion_tile.dart'
     show SliverExpansionTileController;
 
 class ColorPalette {
@@ -23,16 +23,6 @@ final palettes = [
       const Color(0xffE9EFEC),
       const Color(0xffDEF9C4),
       const Color(0xff9CDBA6),
-      const Color(0xffEF5A6F),
-      const Color(0xffFFF1DB),
-      const Color(0xff536493),
-      const Color(0xff3AA6B9),
-      const Color(0xffFFD0D0),
-      const Color(0xffFF9EAA),
-      const Color(0xff8E7AB5),
-      const Color(0xffB784B7),
-      const Color(0xffE493B3),
-      const Color(0xffEEA5A6),
     ],
     SliverExpansionTileController(),
   ),
