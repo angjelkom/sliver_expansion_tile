@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import 'package:sliver_expansion_tile/sliver_expansion_tile.dart'
+import 'package:sliver_expansion_tile/sliver_expansion_tile_new.dart'
     show SliverExpansionTileController;
 
 class ColorPalette {
