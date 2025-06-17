@@ -9,7 +9,12 @@ void main() {
       MaterialApp(
         home: CustomScrollView(
           slivers: [
-            SliverExpansionTile(title: Text('Title'), children: [Container()]),
+            SliverExpansionTile(
+              title: Text('Title'),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                return Container();
+              }, childCount: 5),
+            ),
           ],
         ),
       ),
