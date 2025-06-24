@@ -299,33 +299,23 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
     }
   }
 
-  SliverExpansionTileParentData calculateParentData(RenderBox child) {
-    final SliverExpansionTileParentData childParentData = child.data;
-
-    if (!childParentData.needsLayout) {
-      return childParentData.calculate(scrollOffset: constraints.scrollOffset);
-    }
-
-    return childParentData.calculate(
-      childExtent: paintExtentOf(child),
-      scrollOffset: constraints.scrollOffset,
-    );
-  }
-
-  SliverExpansionTileParentData calculatePrevParentData(RenderBox child) {
+  SliverExpansionTileParentData _calculateParentData(
+    RenderBox child, {
+    bool leading = false,
+  }) {
     final SliverExpansionTileParentData childParentData = child.data;
 
     if (!childParentData.needsLayout) {
       return childParentData.calculate(
         scrollOffset: constraints.scrollOffset,
-        leading: true,
+        leading: leading,
       );
     }
 
     return childParentData.calculate(
       childExtent: paintExtentOf(child),
       scrollOffset: constraints.scrollOffset,
-      leading: true,
+      leading: leading,
     );
   }
 
@@ -369,7 +359,7 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
     while (child != null) {
       child.layout(childConstraints, parentUsesSize: true);
 
-      calculateParentData(child);
+      _calculateParentData(child);
 
       if (child == firstChild) {
         remainingPaintExtent = min(
@@ -432,7 +422,7 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
     while (firstChildIndex > 0 && firstChild!.nextLayoutOffset >= 0) {
       insertAndLayoutLeadingChild(childConstraints, parentUsesSize: true);
 
-      calculatePrevParentData(firstChild!);
+      _calculateParentData(firstChild!, leading: true);
     }
 
     while (_isExpanded &&
@@ -447,7 +437,7 @@ class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
         break;
       }
 
-      calculateParentData(child);
+      _calculateParentData(child);
     }
 
     final totalExtent = lastChild!.totalExtent;
