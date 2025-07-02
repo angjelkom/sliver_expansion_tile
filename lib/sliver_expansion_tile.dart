@@ -21,6 +21,11 @@ class SliverExpansionTileController {
     }
   }
 
+  void stop() {
+    assert(_state != null);
+    _state!._stopAnimation();
+  }
+
   void collapse() {
     assert(_state != null);
     if (isExpanded) {
@@ -53,7 +58,7 @@ class SliverExpansionTile extends StatefulWidget {
     this.subtitle,
     this.leading,
     this.trailing,
-    required this.children,
+    required this.delegate,
     this.initiallyExpanded = false,
     this.controller,
     this.border,
@@ -66,7 +71,7 @@ class SliverExpansionTile extends StatefulWidget {
   final Widget? subtitle;
   final Widget? leading;
   final Widget? trailing;
-  final List<Widget> children;
+  final SliverChildDelegate delegate;
   final bool initiallyExpanded;
   final SliverExpansionTileController? controller;
   final BorderSide? border;
@@ -90,7 +95,10 @@ class _SliverExpansionTileState extends State<SliverExpansionTile>
       widget.controller ?? SliverExpansionTileController();
 
   late final Animation<double> _iconTurns = _animationController.drive(
-    Tween<double>(begin: 0.0, end: 0.5).chain(CurveTween(curve: Curves.easeIn)),
+    Tween<double>(
+      begin: 0.0,
+      end: 0.5,
+    ).chain(CurveTween(curve: Curves.easeInOut)),
   );
 
   @override
@@ -104,6 +112,10 @@ class _SliverExpansionTileState extends State<SliverExpansionTile>
     _tileController._state = null;
     _animationController.dispose();
     super.dispose();
+  }
+
+  void _stopAnimation() {
+    _animationController.stop();
   }
 
   void _toggleExpansion() {
@@ -124,50 +136,57 @@ class _SliverExpansionTileState extends State<SliverExpansionTile>
   @override
   Widget build(BuildContext context) {
     return _SliverExpansionTile(
-      title: _ExpansionTileTitle(
-        title: widget.title,
-        subtitle: widget.subtitle,
-        leading: widget.leading,
-        trailing:
-            widget.trailing ??
-            RotationTransition(
-              turns: _iconTurns,
-              child: const Icon(Icons.expand_more),
-            ),
-        color: widget.titleColor,
-      ),
       animationController: _animationController,
       controller: _tileController,
+      isExpanded: _isExpanded,
       border: widget.border,
       borderRadius: widget.borderRadius,
-      children: widget.children,
+      delegate: _SliverExpansionTileDelegate(
+        widget.delegate,
+        title: _ExpansionTileTitle(
+          title: widget.title,
+          subtitle: widget.subtitle,
+          leading: widget.leading,
+          trailing:
+              widget.trailing ??
+              RotationTransition(
+                turns: _iconTurns,
+                child: const Icon(Icons.expand_more),
+              ),
+          color: widget.titleColor,
+        ),
+      ),
     );
   }
 }
 
-class _SliverExpansionTile extends MultiChildRenderObjectWidget {
-  _SliverExpansionTile({
-    required this.title,
-    required List<Widget> children,
+class _SliverExpansionTile extends SliverMultiBoxAdaptorWidget {
+  const _SliverExpansionTile({
     required this.animationController,
     required this.controller,
+    this.isExpanded = false,
     this.border,
     this.borderRadius = Radius.zero,
-  }) : super(children: [title, ...children]);
+    required super.delegate,
+  });
 
-  final Widget title;
   final AnimationController animationController;
   final SliverExpansionTileController controller;
   final BorderSide? border;
   final Radius borderRadius;
+  final bool isExpanded;
 
   @override
   RenderSliverExpansionTile createRenderObject(BuildContext context) {
+    final SliverMultiBoxAdaptorElement element =
+        context as SliverMultiBoxAdaptorElement;
     return RenderSliverExpansionTile(
+      childManager: element,
       animationController: animationController,
       controller: controller,
       border: border,
       borderRadius: borderRadius,
+      isExpanded: isExpanded,
     );
   }
 
@@ -180,22 +199,23 @@ class _SliverExpansionTile extends MultiChildRenderObjectWidget {
       ..animationController = animationController
       ..controller = controller
       ..border = border
-      ..borderRadius = borderRadius;
+      ..borderRadius = borderRadius
+      ..isExpanded = isExpanded;
   }
 }
 
-class RenderSliverExpansionTile extends RenderSliver
-    with
-        ContainerRenderObjectMixin<RenderObject, SliverExpansionTileParentData>,
-        RenderSliverHelpers {
+class RenderSliverExpansionTile extends RenderSliverMultiBoxAdaptor {
   RenderSliverExpansionTile({
     required AnimationController animationController,
     required SliverExpansionTileController controller,
+    bool isExpanded = false,
     BorderSide? border,
     Radius borderRadius = Radius.zero,
+    required super.childManager,
   }) : _animationController = animationController,
        _controller = controller,
        _border = border,
+       _isExpanded = isExpanded,
        _borderRadius = borderRadius {
     _animationController.addListener(markNeedsLayout);
   }
@@ -220,6 +240,17 @@ class RenderSliverExpansionTile extends RenderSliver
   set controller(SliverExpansionTileController value) {
     if (_controller != value) {
       _controller = value;
+    }
+  }
+
+  bool _isExpanded = false;
+
+  bool get isExpanded => _isExpanded;
+
+  set isExpanded(bool value) {
+    if (_isExpanded != value) {
+      _isExpanded = value;
+      markNeedsPaint();
     }
   }
 
@@ -268,47 +299,156 @@ class RenderSliverExpansionTile extends RenderSliver
     }
   }
 
+  SliverExpansionTileParentData _calculateParentData(
+    RenderBox child, {
+    bool leading = false,
+  }) {
+    final SliverExpansionTileParentData childParentData = child.data;
+
+    if (!childParentData.needsLayout) {
+      return childParentData.calculate(
+        scrollOffset: constraints.scrollOffset,
+        leading: leading,
+      );
+    }
+
+    return childParentData.calculate(
+      childExtent: paintExtentOf(child),
+      scrollOffset: constraints.scrollOffset,
+      leading: leading,
+    );
+  }
+
   @override
   void performLayout() {
-    if (firstChild == null) {
+    childManager
+      ..didStartLayout()
+      ..setDidUnderflow(false);
+
+    final SliverConstraints constraints = this.constraints;
+    final BoxConstraints childConstraints = constraints.asBoxConstraints();
+    double scrollOffset = constraints.scrollOffset;
+
+    double originalRemainingPaintExtent = constraints.remainingPaintExtent;
+    double remainingPaintExtent = originalRemainingPaintExtent;
+    bool hasVisualOverflow = false;
+
+    if (originalRemainingPaintExtent == 0.0) {
+      if (childCount > 0) {
+        collectGarbage(1, 0);
+      }
       geometry = SliverGeometry.zero;
+      childManager.didFinishLayout();
       return;
     }
 
-    final SliverConstraints constraints = this.constraints;
-    double scrollOffset = constraints.scrollOffset;
-    double remainingPaintExtent = constraints.remainingPaintExtent;
-    double totalExtent = 0.0;
-    double paintExtent = 0.0;
-    double layoutOffset = 0.0;
-    bool hasVisualOverflow = false;
-
-    RenderBox? child = firstChild as RenderBox?;
-    while (child != null) {
-      final SliverExpansionTileParentData childParentData =
-          child.parentData! as SliverExpansionTileParentData;
-
-      child.layout(constraints.asBoxConstraints(), parentUsesSize: true);
-      double childExtent = child.size.height;
-
-      if (child != firstChild) {
-        childExtent *= _animationController.value;
+    if (firstChild == null) {
+      if (!addInitialChild(layoutOffset: -scrollOffset)) {
+        geometry = SliverGeometry.zero;
+        childManager.didFinishLayout();
+        return;
       }
-
-      double paintOffset = layoutOffset - scrollOffset;
-      childParentData.paintOffset = Offset(0, paintOffset);
-
-      totalExtent += childExtent;
-      layoutOffset += childExtent;
-
-      paintExtent += childExtent;
-
-      hasVisualOverflow = paintExtent > remainingPaintExtent;
-
-      child = childAfter(child) as RenderBox?;
     }
 
-    paintExtent -= scrollOffset;
+    RenderBox? child = firstChild!;
+
+    RenderBox? leadingGarbageChild;
+    RenderBox? trailingGarbageChild;
+    int totalChildren = childManager.childCount;
+
+    while (child != null) {
+      child.layout(childConstraints, parentUsesSize: true);
+
+      _calculateParentData(child);
+
+      if (child == firstChild) {
+        remainingPaintExtent = min(
+          max(
+            indexOf(firstChild!) == 0 ? firstChild!.childExtent : 0,
+            originalRemainingPaintExtent * _animationController.value,
+          ),
+          originalRemainingPaintExtent,
+        );
+      }
+
+      if (child.data.layoutOffset > remainingPaintExtent ||
+          !_isExpanded && child.data.layoutOffset == remainingPaintExtent) {
+        trailingGarbageChild = child;
+      }
+
+      final prevChild = child;
+      child = childAfter(child);
+      if (child != null) {
+        if (child.data.nextLayoutOffset < 0) {
+          leadingGarbageChild = prevChild;
+        }
+      }
+      if (remainingPaintExtent == 0.0) {
+        break;
+      }
+    }
+
+    if (remainingPaintExtent == 0.0) {
+      if (childCount > 0) {
+        collectGarbage(1, 0);
+      }
+      geometry = SliverGeometry.zero;
+      childManager.didFinishLayout();
+      return;
+    }
+
+    int leadingGarbage =
+        leadingGarbageChild != null
+            ? calculateLeadingGarbage(
+              firstIndex: indexOf(leadingGarbageChild) + 1,
+            )
+            : 0;
+
+    int trailingGarbage =
+        trailingGarbageChild != null
+            ? calculateTrailingGarbage(
+              lastIndex: indexOf(trailingGarbageChild) - 1,
+            )
+            : 0;
+
+    collectGarbage(leadingGarbage, trailingGarbage);
+
+    if (firstChild == null) {
+      geometry = SliverGeometry.zero;
+      childManager.didFinishLayout();
+      return;
+    }
+    final firstChildIndex = indexOf(firstChild!);
+    while (firstChildIndex > 0 && firstChild!.nextLayoutOffset >= 0) {
+      insertAndLayoutLeadingChild(childConstraints, parentUsesSize: true);
+
+      _calculateParentData(firstChild!, leading: true);
+    }
+
+    while (_isExpanded &&
+        lastChild!.nextLayoutOffset < remainingPaintExtent &&
+        childCount < totalChildren) {
+      child = insertAndLayoutChild(
+        constraints.asBoxConstraints(),
+        parentUsesSize: true,
+        after: lastChild,
+      );
+      if (child == null) {
+        break;
+      }
+
+      _calculateParentData(child);
+    }
+
+    final totalExtent = lastChild!.totalExtent;
+
+    final double paintExtent = calculatePaintOffset(
+      constraints,
+      from: childScrollOffset(firstChild!) ?? 0.0,
+      to: totalExtent,
+    );
+
+    hasVisualOverflow = paintExtent > remainingPaintExtent;
 
     double clampedPaintExtent = paintExtent.clamp(0.0, remainingPaintExtent);
 
@@ -317,64 +457,53 @@ class RenderSliverExpansionTile extends RenderSliver
       paintExtent: clampedPaintExtent,
       maxPaintExtent: totalExtent,
       hasVisualOverflow: hasVisualOverflow,
-      cacheExtent: calculateCacheOffset(
-        constraints,
-        from: 0.0,
-        to: totalExtent,
-      ),
     );
+
+    childManager.didFinishLayout();
   }
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    RenderBox? child = firstChild as RenderBox?;
+    RenderBox? child = firstChild;
     final scrollOffset = constraints.scrollOffset;
     final double width = constraints.crossAxisExtent;
-    final height = max(
-      geometry!.scrollExtent * _animationController.value,
-      child!.size.height,
-    );
+    final height = geometry!.paintExtent;
+    final borderHeight = geometry!.scrollExtent;
 
-    context.pushClipRRect(
-      needsCompositing,
-      offset,
-      Offset.zero & Size(width, height),
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, -scrollOffset, width, height),
-        _borderRadius,
-      ),
-      (PaintingContext innerContext, Offset innerOffset) {
-        final Canvas canvas = innerContext.canvas;
+    final bounds = Offset.zero & Size(width, height);
+    final clipRRect = RRect.fromRectAndRadius(bounds, _borderRadius);
 
-        while (child != null) {
-          final SliverExpansionTileParentData childParentData =
-              child!.parentData! as SliverExpansionTileParentData;
-          if (child == firstChild || _animationController.value > 0) {
-            context.paintChild(
-              child!,
-              childParentData.paintOffset + innerOffset,
-            );
-          }
-          child = childAfter(child!) as RenderBox?;
-        }
+    context.pushClipRRect(needsCompositing, offset, bounds, clipRRect, (
+      PaintingContext innerContext,
+      Offset innerOffset,
+    ) {
+      while (child != null) {
+        final SliverExpansionTileParentData? childParentData =
+            child!.parentData as SliverExpansionTileParentData?;
 
-        if (_border != null) {
-          final Path path =
-              Path()..addRRect(
-                RRect.fromRectAndRadius(
-                  Rect.fromLTWH(
-                    offset.dx,
-                    offset.dy - scrollOffset,
-                    width,
-                    height,
-                  ),
-                  _borderRadius,
+        innerContext.paintChild(
+          child!,
+          innerOffset + Offset(0, childParentData?.layoutOffset ?? 0),
+        );
+        child = childAfter(child!);
+      }
+
+      if (_border != null) {
+        final Path path =
+            Path()..addRRect(
+              RRect.fromRectAndRadius(
+                Rect.fromLTWH(
+                  innerOffset.dx,
+                  innerOffset.dy - scrollOffset,
+                  width,
+                  borderHeight,
                 ),
-              );
-          canvas.drawPath(path, _border!.toPaint());
-        }
-      },
-    );
+                _borderRadius,
+              ),
+            );
+        innerContext.canvas.drawPath(path, _border!.toPaint());
+      }
+    });
   }
 
   @override
@@ -384,9 +513,9 @@ class RenderSliverExpansionTile extends RenderSliver
 
   @override
   double childMainAxisPosition(covariant RenderObject child) {
-    final SliverExpansionTileParentData childParentData =
-        child.parentData! as SliverExpansionTileParentData;
-    return childParentData.paintOffset.dy;
+    final SliverExpansionTileParentData? childParentData =
+        child.parentData as SliverExpansionTileParentData?;
+    return childParentData?.layoutOffset ?? 0;
   }
 
   @override
@@ -395,7 +524,7 @@ class RenderSliverExpansionTile extends RenderSliver
     required double mainAxisPosition,
     required double crossAxisPosition,
   }) {
-    RenderBox? child = lastChild as RenderBox?;
+    RenderBox? child = lastChild;
 
     while (child != null) {
       final hit = hitTestBoxChild(
@@ -406,7 +535,7 @@ class RenderSliverExpansionTile extends RenderSliver
       );
 
       if (hit) return child == firstChild;
-      child = childBefore(child) as RenderBox?;
+      child = childBefore(child);
     }
 
     return false;
@@ -419,9 +548,6 @@ class RenderSliverExpansionTile extends RenderSliver
     }
   }
 }
-
-class SliverExpansionTileParentData extends SliverPhysicalParentData
-    with ContainerParentDataMixin<RenderObject> {}
 
 class _ExpansionTileTitle extends StatelessWidget {
   const _ExpansionTileTitle({
@@ -470,5 +596,96 @@ class _ExpansionTileTitle extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class SliverExpansionTileParentData extends SliverMultiBoxAdaptorParentData {
+  double _childExtent = 0.0;
+
+  double _layoutOffset = 0.0;
+  double _scrollOffset = 0.0;
+
+  bool _needsLayout = true;
+
+  @override
+  double get layoutOffset => _layoutOffset - _scrollOffset;
+  double get nextLayoutOffset => layoutOffset + _childExtent;
+  double get childExtent => _childExtent;
+  double get totalExtent => _layoutOffset + _childExtent;
+  bool get needsLayout => _needsLayout;
+
+  SliverExpansionTileParentData calculate({
+    double? childExtent,
+    double? scrollOffset,
+    bool leading = false,
+  }) {
+    _childExtent = childExtent ?? _childExtent;
+    _scrollOffset = scrollOffset ?? _scrollOffset;
+
+    if (!_needsLayout) {
+      return this;
+    }
+
+    if (leading) {
+      final nextParentData =
+          nextSibling?.parentData as SliverExpansionTileParentData?;
+
+      _layoutOffset = (nextParentData?._layoutOffset ?? 0) - _childExtent;
+    } else {
+      final prevParentData =
+          previousSibling?.parentData as SliverExpansionTileParentData?;
+
+      _layoutOffset =
+          (prevParentData?._layoutOffset ?? 0) +
+          (prevParentData?._childExtent ?? 0);
+    }
+    _needsLayout = false;
+    return this;
+  }
+
+  @override
+  String toString() {
+    return 'index: $index; '
+        'layoutOffset: $_layoutOffset; '
+        'childExtent: $_childExtent; '
+        'nextLayoutOffset: $nextLayoutOffset; '
+        'totalExtent: $totalExtent; '
+        'scrollOffset: $_scrollOffset';
+  }
+}
+
+extension SliverExpansionTileParentDataExtension on RenderBox {
+  SliverExpansionTileParentData get data =>
+      parentData as SliverExpansionTileParentData;
+
+  double get layoutOffset => data.layoutOffset;
+  double get nextLayoutOffset => data.nextLayoutOffset;
+  double get childExtent => data.childExtent;
+  double get totalExtent => data.totalExtent;
+}
+
+class _SliverExpansionTileDelegate extends SliverChildDelegate {
+  final Widget title;
+  final SliverChildDelegate delegate;
+
+  _SliverExpansionTileDelegate(this.delegate, {required this.title});
+
+  @override
+  Widget? build(BuildContext context, int index) {
+    if (index == 0) {
+      return title;
+    }
+    return delegate.build(context, index - 1);
+  }
+
+  @override
+  bool shouldRebuild(covariant _SliverExpansionTileDelegate oldDelegate) {
+    return title != oldDelegate.title || delegate != oldDelegate.delegate;
+  }
+
+  @override
+  int? get estimatedChildCount {
+    final count = super.estimatedChildCount;
+    return count != null ? count + 1 : null;
   }
 }
